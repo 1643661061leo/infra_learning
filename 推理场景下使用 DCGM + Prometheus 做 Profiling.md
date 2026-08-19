@@ -13,7 +13,7 @@
 5. 性能达到拐点后，应该优化参数还是增加 GPU？
     
 
-DCGM 和 Prometheus 主要完成“持续观测与对比”。如果要定位到具体 CUDA Kernel，则需要进一步使用 Nsight Systems 或 Nsight Compute。
+DCGM 和 ==Prometheus== 主要完成“持续观测与对比”。如果要定位到具体 CUDA Kernel，则需要进一步使用 [[Nsight Systems]] 或 Nsight Compute。
 
 ---
 
