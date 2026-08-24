@@ -1,23 +1,32 @@
 {
   "main": {
-    "id": "11128d4cb19073ea",
+    "id": "eb2bc1e4ca74579a",
     "type": "split",
     "children": [
       {
-        "id": "51ca351a92ec4e66",
+        "id": "9adb69b83afd7796",
         "type": "tabs",
         "children": [
           {
+<<<<<<< Updated upstream
             "id": "38f8d175fa082d67",
+=======
+            "id": "96a4b5cacf078050",
+>>>>>>> Stashed changes
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
+<<<<<<< Updated upstream
                 "file": "Parallelization strategy/DCP、PCP 并行策略.md",
+=======
+                "file": "Profile/LLM 推理指标.md",
+>>>>>>> Stashed changes
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
+<<<<<<< Updated upstream
               "title": "DCP、PCP 并行策略"
             }
           },
@@ -37,25 +46,31 @@
           }
         ],
         "currentTab": 1
+=======
+              "title": "LLM 推理指标"
+            }
+          }
+        ]
+>>>>>>> Stashed changes
       }
     ],
     "direction": "vertical"
   },
   "left": {
-    "id": "2eeab0cbce82821c",
+    "id": "855781754a0bddac",
     "type": "split",
     "children": [
       {
-        "id": "6df225bf2710e953",
+        "id": "6fa5ea01f430d638",
         "type": "tabs",
         "children": [
           {
-            "id": "2b45353f5e45c454",
+            "id": "340d31450ee898d1",
             "type": "leaf",
             "state": {
               "type": "file-explorer",
               "state": {
-                "sortOrder": "byCreatedTime",
+                "sortOrder": "alphabetical",
                 "autoReveal": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -65,7 +80,7 @@
             }
           },
           {
-            "id": "bf9331d706adad8d",
+            "id": "2dc30cc4cd9977fd",
             "type": "leaf",
             "state": {
               "type": "search",
@@ -82,7 +97,7 @@
             }
           },
           {
-            "id": "47abe79ff523df6c",
+            "id": "10a1001f33d42491",
             "type": "leaf",
             "state": {
               "type": "bookmarks",
@@ -98,23 +113,27 @@
       }
     ],
     "direction": "horizontal",
-    "width": 200
+    "width": 300
   },
   "right": {
-    "id": "db68328dce7bb526",
+    "id": "ad261f1bf908422e",
     "type": "split",
     "children": [
       {
-        "id": "9d620fdee563f578",
+        "id": "5132ebc6328e8d3c",
         "type": "tabs",
         "children": [
           {
-            "id": "f7ab1accc794037e",
+            "id": "453d526000fb6c3b",
             "type": "leaf",
             "state": {
               "type": "backlink",
               "state": {
+<<<<<<< Updated upstream
                 "file": "Parallelization strategy/DCP、PCP 并行策略.md",
+=======
+                "file": "Profile/LLM 推理指标.md",
+>>>>>>> Stashed changes
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -128,12 +147,16 @@
             }
           },
           {
-            "id": "9f6bd2dbc330d6f8",
+            "id": "d0a8cd762a9beaa9",
             "type": "leaf",
             "state": {
               "type": "outgoing-link",
               "state": {
+<<<<<<< Updated upstream
                 "file": "Parallelization strategy/DCP、PCP 并行策略.md",
+=======
+                "file": "Profile/LLM 推理指标.md",
+>>>>>>> Stashed changes
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
@@ -142,7 +165,7 @@
             }
           },
           {
-            "id": "19cc0c73c9550303",
+            "id": "c8e2907c501fe33c",
             "type": "leaf",
             "state": {
               "type": "tag",
@@ -157,7 +180,7 @@
             }
           },
           {
-            "id": "9fcb7911940af420",
+            "id": "2522ae01d69d71c5",
             "type": "leaf",
             "state": {
               "type": "all-properties",
@@ -171,12 +194,16 @@
             }
           },
           {
-            "id": "da1a8a2a21e5d485",
+            "id": "dd3d4066394696c0",
             "type": "leaf",
             "state": {
               "type": "outline",
               "state": {
+<<<<<<< Updated upstream
                 "file": "Parallelization strategy/DCP、PCP 并行策略.md",
+=======
+                "file": "Profile/LLM 推理指标.md",
+>>>>>>> Stashed changes
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -203,6 +230,7 @@
       "bases:新建数据库": false
     }
   },
+<<<<<<< Updated upstream
   "active": "264eb57bc8974748",
   "lastOpenFiles": [
     "Parallelization strategy/DP ATTENTION(DPA).md",
@@ -229,4 +257,8 @@
     "Scheduler",
     "Profile"
   ]
+=======
+  "active": "96a4b5cacf078050",
+  "lastOpenFiles": []
+>>>>>>> Stashed changes
 }
