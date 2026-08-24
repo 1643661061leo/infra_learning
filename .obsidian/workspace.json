@@ -55,12 +55,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Scheduler/vLLM 调度.md",
+                "file": "Parallelization strategy/DCP、PCP 并行策略.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "vLLM 调度"
+              "title": "DCP、PCP 并行策略"
             }
           }
         ],
@@ -142,7 +142,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Scheduler/vLLM 调度.md",
+                "file": "Parallelization strategy/DCP、PCP 并行策略.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -161,7 +161,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Scheduler/vLLM 调度.md",
+                "file": "Parallelization strategy/DCP、PCP 并行策略.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
@@ -204,7 +204,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Scheduler/vLLM 调度.md",
+                "file": "Parallelization strategy/DCP、PCP 并行策略.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -231,21 +231,23 @@
       "bases:新建数据库": false
     }
   },
-  "active": "38f8d175fa082d67",
+  "active": "2b45353f5e45c454",
   "lastOpenFiles": [
+    "Basic Knowledge/并行策略.md",
+    "Parallelization strategy/DCP、PCP 并行策略.md",
+    "Parallelization strategy",
+    "Profile/LLM 推理指标.md",
+    "Profile/推理场景下使用 DCGM + Prometheus 做 Profiling.md",
+    "Scheduler/vLLM 调度.md",
     "Scheduler/vLLM 调度代码速读.md",
     "Scheduler/SGLang 调度代码速读.md",
-    "Scheduler/vLLM 调度.md",
     "Scheduler/SGLang 调度.md",
-    "Profile/LLM 推理指标.md",
     "Scheduler/SGLang 调度（代码篇）.md",
     "KV cache/Retract.md",
     "KV cache",
     "Decode",
     "Prefill",
-    "Profile/推理场景下使用 DCGM + Prometheus 做 Profiling.md",
     "Decode/投机解码.md",
-    "Basic Knowledge/并行策略.md",
     "KV cache/Prefix Cache.md",
     "Prefill/Chunked Prefill.md",
     "Decode/Continuous Batching.md",
