@@ -403,6 +403,16 @@ SGLang 原生 API 使用 `max_new_tokens`，OpenAI 兼容 API 通常使用 `max_
 
 ## 5. 按目标选择调优方向
 
+|现象|更可能的原因|
+|---|---|
+|Queue Time 高，TTFT 高，TPOT 正常|系统过载、KV 容量不足、请求排队|
+|Queue Time 正常，TTFT 高|Prefill 慢、长输入、PCP 通信或 KV 传输|
+|TTFT 正常，TPOT 和 ITL 高|Decode/KV 带宽、DCP/TP/EP 通信|
+|TPOT 正常，P95 ITL 高|Prefill 干扰、调度抖动、batch 切换|
+|P95 TTFT 高但平均 TTFT 正常|少量长 Prompt、排队长尾或负载不均|
+|TTFT、TPOT 都正常，E2E 高|输出长度大，或者客户端/网络/收尾开销|
+|开 PCP 后 TPOT 下降|通常是 Prefill 阻塞减少，不一定是 Decode kernel 变快
+
 ### 目标 A：降低交互延迟
 
 优先关注：
