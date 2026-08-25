@@ -335,7 +335,7 @@ vLLM 通过 `--compilation-config` 控制 `torch.compile` 与 CUDA Graph；SGLan
 - vLLM 当前原生 DP 参数更偏向 MoE 部署；普通 Dense 模型常使用多个独立实例和外部负载均衡。
     
 
-### 3.8 [[投机解码]]
+### 3.8 [[Speculative Decoding]]
 
 |   |   |
 |---|---|
