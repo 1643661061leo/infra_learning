@@ -17,7 +17,7 @@ FFN/MoE：  汇集或路由各 GPU 的 token，继续共享分布式权重计算
 
 ---
 
-## 2. 为什么普通 TP 在 MLA 上浪费 KV Cache
+## 2. 为什么普通 TP 在 MLA 上浪费KV Cache
 
 普通 Tensor Parallel（TP）把模型权重、Q heads 等沿张量维切到多张 GPU，但一个请求仍由整个 TP group 协作处理。
 

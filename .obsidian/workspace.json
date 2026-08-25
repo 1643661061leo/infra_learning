@@ -1,32 +1,23 @@
 {
   "main": {
-    "id": "eb2bc1e4ca74579a",
+    "id": "11128d4cb19073ea",
     "type": "split",
     "children": [
       {
-        "id": "9adb69b83afd7796",
+        "id": "51ca351a92ec4e66",
         "type": "tabs",
         "children": [
           {
-<<<<<<< Updated upstream
             "id": "38f8d175fa082d67",
-=======
-            "id": "96a4b5cacf078050",
->>>>>>> Stashed changes
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-<<<<<<< Updated upstream
                 "file": "Parallelization strategy/DCP、PCP 并行策略.md",
-=======
-                "file": "Profile/LLM 推理指标.md",
->>>>>>> Stashed changes
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-<<<<<<< Updated upstream
               "title": "DCP、PCP 并行策略"
             }
           },
@@ -36,41 +27,35 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Basic Knowledge/并行策略.md",
+                "file": "Parallelization strategy/DP ATTENTION(DPA).md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "并行策略"
+              "title": "DP ATTENTION(DPA)"
             }
           }
         ],
         "currentTab": 1
-=======
-              "title": "LLM 推理指标"
-            }
-          }
-        ]
->>>>>>> Stashed changes
       }
     ],
     "direction": "vertical"
   },
   "left": {
-    "id": "855781754a0bddac",
+    "id": "2eeab0cbce82821c",
     "type": "split",
     "children": [
       {
-        "id": "6fa5ea01f430d638",
+        "id": "6df225bf2710e953",
         "type": "tabs",
         "children": [
           {
-            "id": "340d31450ee898d1",
+            "id": "2b45353f5e45c454",
             "type": "leaf",
             "state": {
               "type": "file-explorer",
               "state": {
-                "sortOrder": "alphabetical",
+                "sortOrder": "byCreatedTime",
                 "autoReveal": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -80,7 +65,7 @@
             }
           },
           {
-            "id": "2dc30cc4cd9977fd",
+            "id": "bf9331d706adad8d",
             "type": "leaf",
             "state": {
               "type": "search",
@@ -97,7 +82,7 @@
             }
           },
           {
-            "id": "10a1001f33d42491",
+            "id": "47abe79ff523df6c",
             "type": "leaf",
             "state": {
               "type": "bookmarks",
@@ -113,27 +98,23 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 200
   },
   "right": {
-    "id": "ad261f1bf908422e",
+    "id": "db68328dce7bb526",
     "type": "split",
     "children": [
       {
-        "id": "5132ebc6328e8d3c",
+        "id": "9d620fdee563f578",
         "type": "tabs",
         "children": [
           {
-            "id": "453d526000fb6c3b",
+            "id": "f7ab1accc794037e",
             "type": "leaf",
             "state": {
               "type": "backlink",
               "state": {
-<<<<<<< Updated upstream
                 "file": "Parallelization strategy/DCP、PCP 并行策略.md",
-=======
-                "file": "Profile/LLM 推理指标.md",
->>>>>>> Stashed changes
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -147,16 +128,12 @@
             }
           },
           {
-            "id": "d0a8cd762a9beaa9",
+            "id": "9f6bd2dbc330d6f8",
             "type": "leaf",
             "state": {
               "type": "outgoing-link",
               "state": {
-<<<<<<< Updated upstream
                 "file": "Parallelization strategy/DCP、PCP 并行策略.md",
-=======
-                "file": "Profile/LLM 推理指标.md",
->>>>>>> Stashed changes
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
@@ -165,7 +142,7 @@
             }
           },
           {
-            "id": "c8e2907c501fe33c",
+            "id": "19cc0c73c9550303",
             "type": "leaf",
             "state": {
               "type": "tag",
@@ -180,7 +157,7 @@
             }
           },
           {
-            "id": "2522ae01d69d71c5",
+            "id": "9fcb7911940af420",
             "type": "leaf",
             "state": {
               "type": "all-properties",
@@ -194,16 +171,12 @@
             }
           },
           {
-            "id": "dd3d4066394696c0",
+            "id": "da1a8a2a21e5d485",
             "type": "leaf",
             "state": {
               "type": "outline",
               "state": {
-<<<<<<< Updated upstream
                 "file": "Parallelization strategy/DCP、PCP 并行策略.md",
-=======
-                "file": "Profile/LLM 推理指标.md",
->>>>>>> Stashed changes
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -230,14 +203,22 @@
       "bases:新建数据库": false
     }
   },
-<<<<<<< Updated upstream
   "active": "264eb57bc8974748",
   "lastOpenFiles": [
+    "flash attention v3 v4.md",
+    "Readme.md",
     "Parallelization strategy/DP ATTENTION(DPA).md",
     "Parallelization strategy/DCP、PCP 并行策略.md",
+    "Parallelization strategy/并行策略概览.md",
     "Profile/LLM 推理指标.md",
+    "Prefill/Chunked Prefill.md",
+    "KV cache/Prefix Cache.md",
+    "KV cache/Retract.md",
+    "Decode/Continuous Batching.md",
+    "Decode/投机解码.md",
+    "KV Cache.md",
+    "Parallelization strategy.md",
     "Basic Knowledge/推理的两个阶段.md",
-    "Basic Knowledge/并行策略.md",
     "Parallelization strategy",
     "Profile/推理场景下使用 DCGM + Prometheus 做 Profiling.md",
     "Scheduler/vLLM 调度.md",
@@ -245,20 +226,11 @@
     "Scheduler/SGLang 调度代码速读.md",
     "Scheduler/SGLang 调度.md",
     "Scheduler/SGLang 调度（代码篇）.md",
-    "KV cache/Retract.md",
     "KV cache",
     "Decode",
     "Prefill",
-    "Decode/投机解码.md",
-    "KV cache/Prefix Cache.md",
-    "Prefill/Chunked Prefill.md",
-    "Decode/Continuous Batching.md",
     "Basic Knowledge",
     "Scheduler",
     "Profile"
   ]
-=======
-  "active": "96a4b5cacf078050",
-  "lastOpenFiles": []
->>>>>>> Stashed changes
 }

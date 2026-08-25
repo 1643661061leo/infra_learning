@@ -311,7 +311,7 @@ SGLang 的 `--schedule-conservativeness`：
 
 vLLM 通过 `--compilation-config` 控制 `torch.compile` 与 CUDA Graph；SGLang 可用 `--cuda-graph-config`、`--cuda-graph-max-bs-decode` 等参数。SGLang 官方指出，提高 CUDA Graph 最大 Batch 可能改善大并发性能，但需要为 Graph Buffer 预留更多显存。[vLLM Compilation 参数](https://docs.vllm.ai/en/latest/configuration/engine_args/)，[SGLang CUDA Graph 参数](https://docs.sglang.io/docs/advanced_features/server_arguments)
 
-### 3.7 [[并行策略]]
+### 3.7 [[并行策略概览]]
 
 |   |   |   |   |
 |---|---|---|---|
