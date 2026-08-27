@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Decode/DSpark.md",
+                "file": "Decode/Continuous Batching.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "DSpark"
+              "title": "Continuous Batching"
             }
           }
         ]
@@ -190,20 +190,22 @@
   },
   "active": "e81bb7f849f14c6f",
   "lastOpenFiles": [
-    "Disaggregation/PD Disaggregation.md",
-    "Decode/DSpark.md",
-    "Decode/Continuous Batching.md",
-    "Decode/Speculative Decoding.md",
-    "KV cache/Retract.md",
     "KV cache/Prefix Cache.md",
-    "Parallelization strategy/并行策略概览.md",
+    "KV cache/Retract.md",
+    "Disaggregation/PD Disaggregation.md",
+    "Decode/Continuous Batching.md",
+    "Attention/flash attention v3 v4.md",
+    "Decode/DSpark.md",
     "Prefill/Chunked Prefill.md",
+    "Parallelization strategy/DCP、PCP 并行策略.md",
+    "Scheduler/SGLang 调度.md",
+    "Scheduler/SGLang 调度代码速读.md",
+    "Decode/Speculative Decoding.md",
+    "Parallelization strategy/并行策略概览.md",
     "Parallelization strategy/DP ATTENTION(DPA).md",
     "Disaggregation",
     "Attention",
-    "Attention/flash attention v3 v4.md",
     "Readme.md",
-    "Parallelization strategy/DCP、PCP 并行策略.md",
     "Profile/LLM 推理指标.md",
     "KV Cache.md",
     "Parallelization strategy.md",
@@ -212,8 +214,6 @@
     "Profile/推理场景下使用 DCGM + Prometheus 做 Profiling.md",
     "Scheduler/vLLM 调度.md",
     "Scheduler/vLLM 调度代码速读.md",
-    "Scheduler/SGLang 调度代码速读.md",
-    "Scheduler/SGLang 调度.md",
     "Scheduler/SGLang 调度（代码篇）.md",
     "KV cache",
     "Decode",
