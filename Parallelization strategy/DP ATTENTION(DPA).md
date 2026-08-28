@@ -1,3 +1,4 @@
+# DP ATTENTION(DPA)原理和流程
 ## 1. 一句话结论
 
 **DP Attention 按请求/batch 切分 Attention 和 KV Cache，但 FFN/MoE 仍跨设备使用 TP/EP。**

@@ -1,3 +1,4 @@
+# PD Disaggregation 原理
 
 > 口径：本文讨论大模型推理服务中的 Prefill/Decode 分离，简称 PD 分离或 P/D Disaggregation。示例参数以 SGLang 为主；具体传输 backend、拓扑和功能组合随版本变化。
 ## 1. 一句话结论

@@ -1,3 +1,4 @@
+# DCP、PCP 并行策略原理和流程
 ## 1. 先记结论
 
 - **PCP 拆“本轮新输入”**：把长 Prompt 的 token 分给多张 GPU 并行计算，核心目标是降低 **TTFT（Time To First Token，首 token 延迟）**。

@@ -119,17 +119,21 @@ TMA 是专门的数据搬运单元，Tensor Core 是矩阵计算单元，两者�
 
 Attention 的基本依赖是：
 
+$$
 [  
 S_j=QK_j^T  
 ]
-
+$$
+$$
 [  
 P_j=\operatorname{softmax}(S_j)  
 ]
-
+$$
+$$
 [  
 O_j=P_jV_j  
 ]
+$$
 
 对于同一个 tile，必须满足：
 
@@ -576,21 +580,27 @@ FA4 使用普通 FMA 指令，通过范围缩减和多项式近似计算一部�
 
 概念上：
 
+$$
 [  
 2^x=2^n2^r,\qquad x=n+r  
 ]
+$$
 
 对于范围有限的 (r)，可以使用多项式近似：
 
+$$
 [  
 2^r\approx a_0+a_1r+a_2r^2+a_3r^3+\cdots  
 ]
+$$
 
 多项式可以使用 Horner 形式计算：
 
+$$
 [  
 a_0+r(a_1+r(a_2+r a_3))  
 ]
+$$
 
 这非常适合 FMA：
 
@@ -652,25 +662,31 @@ O → 当前输出累加器
 
 处理一个新 tile 后：
 
+$$
 \max(m_{\text{old}},m_{\text{tile}})  
-]
+
+$$
 
 旧的输出累加器需要转换到新的数值尺度：
 
-[  
+$$
+  
 O_{\text{old}}  
 \leftarrow  
 O_{\text{old}}  
 \exp(m_{\text{old}}-m_{\text{new}})  
-]
+
+$$
 
 然后再加入当前 tile：
 
+$$
 O_{\text{old}}  
 \exp(m_{\text{old}}-m_{\text{new}})  
 +  
 P_{\text{tile}}V_{\text{tile}}  
-]
+
+$$
 
 每次 running max 变化，都可能需要：
 
@@ -783,84 +799,3 @@ Conditional Rescale：
 |FA4|Blackwell / B200|Tensor Core 增长太快，Softmax、SMEM 等 non-MMA 工作跟不上|更自由的异步流水线，并专门降低 exp、rescale 等开销|
 
 ---
-
-# 五、最终背诵版
-
-## FlashAttention-3
-
-```
-1. Warp Specialization + TMA
-
-   Producer warp 搬下一块数据
-              ||
-   Consumer warpgroup 计算当前块
-
-   → 隐藏数据搬运延迟
-```
-
-```
-2. GEMM + Softmax overlap
-
-   Tensor Core：
-   执行另一个 tile 的 GEMM
-
-              ||
-
-   CUDA/SFU：
-   执行当前 tile 的 Softmax
-
-   → 将 Softmax 藏在跨 tile 的 GEMM 后面
-```
-
-```
-3. FP8 Attention
-
-   FP8 Tensor Core
-        +
-   Block Quantization
-        +
-   Incoherent Processing
-
-   → 提高吞吐，同时控制量化误差
-```
-
-FA3 核心：
-
-> 让 Hopper 上的数据搬运、矩阵乘和 Softmax 尽可能同时执行。
-
----
-
-## FlashAttention-4
-
-```
-1. TMEM + Fully Async MMA
-
-   MMA 发出后异步执行
-            ↓
-   accumulator 写入 TMEM
-            ↓
-   线程继续安排 Softmax、搬运和其他 MMA
-
-   → 减少资源与顺序约束
-   → 支持更深、更自由的流水线
-```
-
-```
-2. Software Exp + Conditional Rescale
-
-   Software Exp：
-   将部分 exp 从拥堵的 MUFU
-   分流给 FMA 单元
-
-   Conditional Rescale：
-   小幅尺度变化时不立即缩放整个输出
-   仅在必要时进行统一修正
-
-   → exp 吞吐提高
-   → rescale 次数减少
-   → Softmax 的关键路径缩短
-```
-
-FA4 核心：
-
-> Blackwell 的 Tensor Core 已经非常快，因此优化重点转向 Softmax、Shared Memory 和其他 non-MMA 开销，让它们能够跟上 Tensor Core。

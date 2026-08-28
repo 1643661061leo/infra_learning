@@ -26,7 +26,7 @@ Continuous Batching 要求框架能独立维护每个请求的：
 - Attention 元数据和采样结果；
 - waiting、running、finished 等调度状态。
 
-每轮 forward 的 batch 大小和成员都可以变化，但每个输出仍通过 request ID 返回给正确的请求。
+==每轮 forward 的 batch 大小和成员都可以变化，但每个输出仍通过 request ID 返回给正确的请求。==
 
 ---
 

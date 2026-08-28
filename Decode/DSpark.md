@@ -1,3 +1,4 @@
+# DSpark具体计算流程
 
 > 本文聚焦三件事：**内部到底怎样算、Tensor 怎样流动、什么时候有收益或负收益**。  
 > 口径基于 DSpark 论文、DeepSeek-AI/DeepSpec 公开实现和 vLLM 当前 DSpark/Adaptive Verification 文档。
