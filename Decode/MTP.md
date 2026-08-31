@@ -67,7 +67,7 @@ current_token_ids                          # [B]
 MTP 使用 h_i + Emb(x_{i+1}) 预测 x_{i+2}
 ```
 
-第一轮状态来自 Target prefill/首次解码；后续来自上一轮 verification。Target 与 MTP 还分别维护 KV Cache。这里约定 Target Cache 截止到 `current_token` 的前一个位置，不包含 `current_token`，因此后面的 verification 输入需要从 `current_token` 开始。
+==第一轮状态来自 Target prefill/首次解码；后续来自上一轮 verification。==Target 与 MTP 还分别维护 KV Cache。这里约定 Target Cache 截止到 `current_token` 的前一个位置，不包含 `current_token`，因此后面的 verification 输入需要从 `current_token` 开始。
 
 ---
 
@@ -605,10 +605,16 @@ speculative-num-draft-tokens：送给 Target 验证的节点预算
 
 ## 13. 优缺点
 
+总结：
+- MTP 降低的是生成候选时的计算量和访存量；
+- MTP 减少的是完整 Target 的串行调用次数；
+- MTP 不会消除 Target 权重和 Target KV Cache；
+- 相比独立的小 Draft 模型，MTP 因为共享 Embedding、LM Head 且只有少量层，额外显存可能更低。
+
 ### 优点
 
 - 复用 Target hidden，并共享 embedding/LM Head，候选通常比无关小模型更贴近 Target。
-- 一个 MTP Block 远轻于重新执行完整 Target。
+- 一个 MTP Block 远轻于重新执行完整 Target，==K+1次串行forward>>k次便宜的forward+1次并行forward。==
 - 不需要完全独立的 Draft 模型或 tokenizer。
 - 可结合 EAGLE 候选树、批量验证与 overlap scheduler。
 - 正确 rejection sampling 保持 Target 输出分布不变。
@@ -617,7 +623,7 @@ speculative-num-draft-tokens：送给 Target 验证的节点预算
 
 - 多步 rollout 是自回归的，后一步依赖前一步候选。
 - 长候选链会累积误差，后缀接受率通常下降。
-- 一个完整额外 Transformer 层的权重、KV Cache 和通信开销不可忽略。
+- 一个完整额外 Transformer 层的==权重、KV Cache 和通信开销==不可忽略。
 - 加速依赖 batch size、接受率、树大小与硬件利用率，配置不当可能负优化。
 - 双 Cache、候选树、回滚和 CUDA Graph shape 增加部署复杂度。
 
@@ -625,13 +631,13 @@ speculative-num-draft-tokens：送给 Target 验证的节点预算
 
 ## 14. 与 DSpark 的推理区别
 
-| 对比项 | MTP / EAGLE | DSpark |
-|---|---|---|
-| Draft 主体 | 一个额外 Transformer Block 多步 rollout | 并行 Backbone 一次产生整个 block |
-| token 依赖 | 每一步依赖前一步候选 | Backbone 并行，轻量 Markov/RNN Head 串行 |
-| 候选结构 | 常配合 top-k 候选树 | 主要是单条并行 block |
-| Target 特征 | Target hidden + 当前 token embedding | Target 多层 hidden 作为每层 K/V context |
-| 验证长度 | EAGLE/服务参数控制 | Confidence Head + hardware-aware scheduler |
+| 对比项       | MTP / EAGLE                        | DSpark                                     |
+| --------- | ---------------------------------- | ------------------------------------------ |
+| Draft 主体  | 一个额外 Transformer Block 多步 rollout  | 并行 Backbone 一次产生整个 block                   |
+| token 依赖  | 每一步依赖前一步候选                         | Backbone 并行，轻量 Markov/RNN Head 串行          |
+| 候选结构      | 常配合 top-k 候选树                      | 主要是单条并行 block                              |
+| Target 特征 | Target hidden + 当前 token embedding | Target 多层 hidden 作为每层 K/V context          |
+| 验证长度      | EAGLE/服务参数控制                       | Confidence Head + hardware-aware scheduler |
 
 ```text
 MTP：用轻量 Transformer Block 自回归地 rollout 候选。
@@ -640,46 +646,3 @@ DSpark：并行算整个 block，再用更轻的 Head 补 token 依赖。
 
 ---
 
-## 15. 完整 Tensor 主线
-
-```text
-parent hidden： [B,H]
-current token： [B]
-        ↓ Embedding
-current embed： [B,H]
-        ↓ concat
-fused：         [B,2H]
-        ↓ eh_proj
-MTP input：     [B,H]
-        ↓ MTP Block
-next hidden：   [B,H]
-        ↓ shared LM Head
-Draft probs：   [B,V]
-        ↓ sample、重复 K 步
-
-Draft tokens： [B,K]
-Draft probs：  [B,K,V]
-        ↓ 与 current token 拼接
-
-Verify input： [B,K+1]
-        ↓ Target 一次 forward
-Target probs： [B,K+1,V]
-        ↓ 前 K 行与 Draft probs 对齐
-
-Accept prob：  [B,K]
-        ↓ 最长连续接受前缀
-Accepted count：[B]
-        ↓
-接受前缀 + correction/bonus
-        ↓
-更新 Target/MTP Cache 与下一轮 hidden-token 对
-```
-
----
-
-## 参考资料
-
-- [DeepSeek-V3 Technical Report](https://arxiv.org/pdf/2412.19437)
-- [DeepSeek-V3 官方 MTP 权重结构](https://github.com/deepseek-ai/DeepSeek-V3/blob/main/README_WEIGHTS.md)
-- [SGLang DeepSeek-V3 MTP / EAGLE 文档](https://github.com/sgl-project/sglang/blob/main/docs/cookbook/autoregressive/DeepSeek/DeepSeek-V3.mdx)
-- [SGLang speculative decoding 文档](https://github.com/sgl-project/sglang/blob/main/docs_new/docs/advanced_features/speculative_decoding.mdx)
