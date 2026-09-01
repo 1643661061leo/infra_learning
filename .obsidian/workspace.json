@@ -41,12 +41,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Prefill/Chunked Prefill.md",
+                "file": "KV cache/Retract.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Chunked Prefill"
+              "title": "Retract"
             }
           }
         ],
@@ -219,13 +219,14 @@
   },
   "active": "29371c44994801c5",
   "lastOpenFiles": [
-    "Decode/Continuous Batching.md",
+    "KV cache/KV Cache 管理.md",
     "KV cache/Prefix Cache.md",
-    "KV cache/Offload.md",
     "KV cache/Retract.md",
     "Parallelization strategy/并行策略概览.md",
+    "Parallelization strategy/DP ATTENTION(DPA).md",
     "Parallelization strategy/DCP、PCP 并行策略.md",
     "Prefill/Chunked Prefill.md",
+    "Decode/Continuous Batching.md",
     "Disaggregation/PD Disaggregation.md",
     "Decode/MTP.md",
     "Decode/DSpark.md",
@@ -233,7 +234,6 @@
     "Profile/LLM 推理指标.md",
     "Profile/CUDA Graph.md",
     "Readme.md",
-    "Parallelization strategy/DP ATTENTION(DPA).md",
     "Profile/推理场景下使用 DCGM + Prometheus 做 Profiling.md",
     "Scheduler/vLLM 调度.md",
     "Scheduler/SGLang 调度.md",
