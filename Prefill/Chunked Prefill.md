@@ -143,7 +143,7 @@ SGLang 把 Prefill 称为 `extend`，由 `Scheduler.get_new_batch_prefill()` 和
 
 实现上的两个特色：
 
-- **与 RadixCache 深度结合**：每个 chunk 的结束位置成为下轮的前缀锚点；关闭 RadixCache 时，也会用轻量 `ChunkCache` 保存 `prefix_indices`，避免丢失已写 KV 的位置。
+- **与 RadixCache 深度结合**：==每个 chunk 的结束位置成为下轮的前缀锚点==；关闭 RadixCache 时，也会用轻量 `ChunkCache` 保存 `prefix_indices`，避免丢失已写 KV 的位置。
 - **Prefill/Decode 默认是两类 batch 路径**：开启 `enable_mixed_chunk` 后，才会把 running Decode 请求合入当前 chunked-prefill batch；否则 Prefill chunk 单独执行。
 
 注意，当前实现中的 `chunked_prefill_size` 实际由 `rem_chunk_tokens` 在整个 Prefill batch 内递减，因此更接近**批级 token 上限**，不应简单理解成“每个请求固定切成同样大小”。Pipeline Parallel 场景还可用 dynamic chunking 根据历史长度调整下一段大小。

@@ -67,13 +67,13 @@ C的Prefill：   4 tokens
 
 一种混批执行流程是：
 
-| 迭代 | batch 中的工作 | 结果 |
-|---:|---|---|
-| 1 | Prefill A(4)、B(4) | `A1、B1` |
-| 2 | Decode A(1)、B(1) | `A2` 完成，得到 `B2`；C 到达 |
-| 3 | Decode B(1) + Prefill C(4) | 得到 `B3、C1` |
-| 4 | Decode B(1)、C(1) | 得到 `B4、C2` |
-| 5 | Decode B(1)、C(1) | `B5、C3` 均完成 |
+|  迭代 | batch 中的工作                 | 结果                   |
+| --: | -------------------------- | -------------------- |
+|   1 | Prefill A(4)、B(4)          | `A1、B1`              |
+|   2 | Decode A(1)、B(1)           | `A2` 完成，得到 `B2`；C 到达 |
+|   3 | Decode B(1) + Prefill C(4) | 得到 `B3、C1`           |
+|   4 | Decode B(1)、C(1)           | 得到 `B4、C2`           |
+|   5 | Decode B(1)、C(1)           | `B5、C3` 均完成          |
 
 关键不是 batch 一直很大，而是 **A 离开后，C 不必等待 B**。
 
@@ -98,7 +98,6 @@ vLLM 的特点是：
 
 - 调度器不必硬分 Prefill 和 Decode 阶段，而是统一计算“本轮还欠多少 token”；
 - PagedAttention 让不同长度请求拥有各自的非连续 KV block table，batch 成员变化时不需要搬动整块 KV；
-- Chunked Prefill 开启时，长 Prefill 可占用 Decode 后剩余的 token 预算，因此数值例子的 `B Decode + C Prefill` 可以在同一次 forward 中执行；
 - Prefix Cache 命中会先增加 `num_computed_tokens`，Continuous Batching 只调度未命中的尾部。
 
 主要调节项是 `max_num_seqs` 和 `max_num_batched_tokens`：前者限制并发请求数，后者限制单轮总计算 token 数。

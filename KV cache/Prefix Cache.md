@@ -12,7 +12,7 @@ Prefix Cache 保存已经计算过的前缀 KV。新请求若拥有完全相同�
        └────── 直接复用KV ──────┘   └只计算这里
 ```
 
-它主要降低重复 Prefill 的 TTFT 和计算量，不会加速后续逐 token Decode。
+它主要==降低重复 Prefill 的 TTFT 和计算量，不会加速后续逐 token Decode。==
 
 ---
 
@@ -78,7 +78,7 @@ extend_input_len = 10 - 8 = 2
 
 ## 4. vLLM：哈希链 + Block Pool
 
-vLLM 不维护 token 前缀树，而是按 KV block 建立全局哈希表。假设 `block_size=4`，请求 1 被分成：
+vLLM 不维护 token 前缀树，而是按 KV block 建立全局**哈希表**。假设 `block_size=4`，请求 1 被分成：
 
 ```text
 B0 = [S1 S2 S3 S4]
@@ -93,7 +93,7 @@ H0 = hash(None, B0中的tokens, extra_keys)
 H1 = hash(H0,   B1中的tokens, extra_keys)
 ```
 
-父 block 的 hash 被放进下一个 block 的 hash，因此 `B1` 不仅表示 `D1~D4`，还隐含其前缀必须是 `S1~S4`。
+==父 block 的 hash 被放进下一个 block 的 hash==，因此 `B1` 不仅表示 `D1~D4`，还隐含==其前缀必须是 `S1~S4`。==
 
 请求 2 到来后的流程：
 
