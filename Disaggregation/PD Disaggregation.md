@@ -12,12 +12,12 @@ PD 分离将请求的两个阶段部署到不同 worker pool：
 
 它是**按推理阶段拆服务**，不是沿张量维度切分。核心收益是==隔离两类 workload，使其可独立调度、优化和扩缩容：==
 
-- P 侧面向计算吞吐和 TTFT；
-- D 侧面向显存带宽、并发与 TPOT/ITL；
+- P 侧面向**计算吞吐和 TTFT**；
+- D 侧面向**显存带宽、并发与 TPOT/ITL**；
 - 避免长 Prefill 阻塞流式 Decode，改善尾部 ITL；
 - P/D 可采用不同的 batch、kernel、并行策略和硬件配比。
 
-代价是跨实例传输 KV、复制模型权重，并引入配对、预分配、路由、背压和故障恢复等复杂度。因此 PD 通常更稳定地改善 TPOT/ITL，但不保证降低 TTFT。
+代价是跨实例传输 KV、复制模型权重，并引入配对、预分配、路由、背压和故障恢复等复杂度。因此 PD 通常==更稳定地改善 TPOT/ITL，但不保证降低 TTFT。==
 
 ## 2. 为什么要拆分
 
@@ -112,10 +112,11 @@ D 的请求驻留时间通常远长于 P 的服务时间，因此不能默认 `P
 PD 是阶段级部署架构；TP、PP、EP、PCP、DCP、DPA 是阶段内部并行方式，可组合使用：
 
 ```text
-P pool：TP + PP + PCP + EP
+P pool：TP + PP + PCP/DPA + EP
 D pool：TP + PP + DPA/DCP + EP + MTP
 ```
 
+一般，**P侧不用DPA**，因为==不同请求的 ISL 差异很大时，Prefill DPA 容易负载不均衡==。除非prefill侧有==足够多的并发请求且长度分布均衡==。
 ## 7. SGLang 最小配置
 
 ```bash
@@ -163,9 +164,17 @@ PD 更适合以下场景：
 - **D 侧 KV 不足**：必须在 P 开始或交接前完成 admission，背压应传到 Gateway；
 - **网络成为瓶颈**：表现为 Prefill 已结束，但 TTFT 仍随 KV 字节数增长且链路饱和；
 - **P/D 配比错误**：==P 少则 TTFT 排队，D 少则 admission/KV 拥塞，池过大则 batch 变小或产生传输突发；==
-- **缓存亲和性丢失**：随机路由降低 prefix cache 命中，导致重复 Prefill 和 KV 传输；
+- **缓存亲和性丢失**：随机路由降低 prefix cache 命中，导致==重复 Prefill 和 KV 传输；==
 - **布局不兼容**：模型版本、RoPE、KV dtype、page size 及 TP/PP/DPA/DCP 映射必须一致或可转换；
 - **交接失败**：P 完成后 D 故障可能触发重算，需要幂等 ID、超时、清理和重试策略。
+
+调优时看这些信号：
+
+- P queue 高、D 经常空闲：加 P；
+- D admission queue 高、KV 接近满：加 D；
+- P/D 都不满但 TTFT 高、NIC 饱和：瓶颈是 KV 网络；
+- D batch 太小：D 可能配得过多；
+- P 完成后大量请求等待 D：D 不足或缺少背压。
 
 ## 9. 结论
 
