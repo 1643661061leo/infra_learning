@@ -224,7 +224,7 @@ SGLang 使用 [[Continuous Batching]]，==细粒度:batch -> req：
 
 这比固定批处理更适合==输出长度不一致的在线请求。
 
-### 第七步：内存不足与 [[Retract]]
+### 第七步：内存不足与 [[Retract and Preemption]]
 
 每轮 Decode 都需要新增 KV Cache。如果下一轮空间不足，SGLang通常先尝试**淘汰可回收的 RadixCache 节点。
 
