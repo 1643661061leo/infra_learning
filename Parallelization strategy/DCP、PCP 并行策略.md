@@ -1,8 +1,8 @@
 # DCP、PCP 并行策略原理和流程
 ## 1. 先记结论
 
-- **PCP 拆“本轮新输入”**：把长 Prompt 的 token 分给多张 GPU 并行计算，核心目标是降低 **TTFT（Time To First Token，首 token 延迟）**。
-- **DCP 拆“历史上下文”**：把 Decode 要读取的 KV Cache 沿序列维切到多张 GPU，核心目标是降低单卡 KV Cache 占用、扩大 batch，并改善长上下文 Decode 的可扩展性。
+- **PCP 拆“本轮新输入”**：把长 Prompt 的 token 分给多张 GPU 并行计算，核心目标是==降低 **TTFT**==。
+- **DCP 拆“历史上下文”**：把 Decode 要读取的 KV Cache 沿序列维切到多张 GPU，核心目标是==降低单卡 KV Cache 占用、扩大 batch，并改善长上下文 Decode 的可扩展性。==
 - 两者都沿 **sequence/context 维**做文章，但服务于两个计算特征完全不同的阶段。
 
 一句话记忆：**PCP 分新题，DCP 分历史资料。**
@@ -33,22 +33,22 @@
 
 因此，不能只做一个笼统的“Context Parallel”：
 
-| 对比项 | PCP | DCP |
-|---|---|---|
-| 全称 | Prefill Context Parallelism | Decode Context Parallelism |
-| 主要阶段 | Prefill | Decode |
-| 切分对象 | Prompt 中待计算的 token / Query | 已存在的 KV Cache |
-| 主要目标 | 降低长 Prompt 的 TTFT | 降低单卡 KV 占用、扩大 batch/吞吐 |
-| 主要瓶颈 | `O(S²)` Attention 计算 | 长 KV 的容量与读取带宽 |
-| 典型通信 | AllGather K/V 或 Ring Attention | 汇集 Query；合并局部 Attention 输出与 LSE |
-| 是否天然增加设备数（vLLM 语义） | 是，PCP 是额外并行维 | 否，通常复用 TP ranks |
-| 主要代价 | 更多 GPU、跨卡 K/V 通信、因果负载均衡 | 每层每步都有通信，可能抬高 TPOT |
+| 对比项                | PCP                            | DCP                             |
+| ------------------ | ------------------------------ | ------------------------------- |
+| 全称                 | Prefill Context Parallelism    | Decode Context Parallelism      |
+| 主要阶段               | Prefill                        | Decode                          |
+| 切分对象               | Prompt 中待计算的 token / Query     | 已存在的 KV Cache                   |
+| 主要目标               | 降低长 Prompt 的 TTFT              | 降低单卡 KV 占用、扩大 batch/吞吐          |
+| 主要瓶颈               | `O(S²)` Attention 计算           | 长 KV 的容量与读取带宽                   |
+| 典型通信               | AllGather K/V 或 Ring Attention | 汇集 Query；合并局部 Attention 输出与 LSE |
+| 是否天然增加设备数（vLLM 语义） | 是，PCP 是额外并行维                   | 否，通常复用 TP ranks                 |
+| 主要代价               | 更多 GPU、跨卡 K/V 通信、因果负载均衡        | 每层每步都有通信，可能抬高 TPOT              |
 
 ---
 
 ## 3. PCP：怎样并行长 Prompt
 
-假设 Prompt 长度为 `S`，PCP 大小为 `P`。总体思路是每个 rank 只负责大约 `S/P` 个 Query 位置；非 Attention 层大多是逐 token 计算，也能直接处理本地 token 切片。真正困难的是：一个 Query 仍需看到符合因果掩码的全局历史 K/V。
+假设 Prompt 长度为 `S`，PCP 大小为 `P`。总体思路是每个 rank 只负责大约 `S/P` 个 Query 位置；非 Attention 层大多是逐 token 计算，也能直接处理本地 token 切片。真正困难的是：==一个 Query 仍需看到符合因果掩码的全局历史 K/V。==
 
 ```text
 长 Prompt:  t0  t1  t2  t3  t4  t5  t6  t7
@@ -68,10 +68,10 @@ PCP rank 1: 处理另一部分 Query/token
 
 特点：
 
-- 实现相对直观，适合“上下文较长，但完整 K/V 仍放得下”的场景；
+- 实现相对直观，适合==上下文较长，但完整 K/V 仍放得下==的场景；
 - Query 侧计算约分摊到 `1/P`；
-- K/V 在各 rank 上复制，因此主要优化计算延迟，不充分节省峰值 K/V 内存；
-- 每层 AllGather 的通信可能成为瓶颈。
+- K/V 在各 rank 上复制，因此主要**优化计算延迟，不充分节省峰值 K/V 内存**；
+- ==每层 AllGather 的通信可能成为瓶颈。==
 
 ### 3.2 策略 B：Partial Q + Partial KV（Ring Attention）
 
@@ -79,7 +79,7 @@ PCP rank 1: 处理另一部分 Query/token
 2. K/V 块沿环逐步发送；
 3. 每收到一个 K/V 块，就计算一份局部 Attention；
 4. 使用 online softmax 的统计量合并各块结果；
-5. 通信与计算尽量重叠。
+5. ==通信与计算尽量overlap==。
 
 特点：
 
@@ -90,7 +90,7 @@ PCP rank 1: 处理另一部分 Query/token
 
 ### 3.3 为什么不能总是连续等分
 
-因果 Attention 是下三角计算：越靠后的 Query，可见的 Key 越多。若简单地把前半段给 rank 0、后半段给 rank 1，rank 1 的工作量会明显更大。
+因果 Attention 是下三角计算：==越靠后的 Query，可见的 Key 越多。若简单地把前半段给 rank 0、后半段给 rank 1，rank 1 的工作量会明显更大。==
 
 工程上常用 round-robin、zigzag 或更细粒度分块，让每个 rank 同时拿到较早和较晚的位置，从而平衡有效 Attention 计算量。它们解决的是**计算负载均衡**，不是改变模型语义。
 
@@ -123,7 +123,7 @@ DCP rank 3:            K3       K7 ...
 
 ### 4.1 一次 Decode step 的数据流
 
-1. 新 token 产生 Query；根据 TP/DCP 的布局，可能先 AllGather Query heads，或在各 DCP rank 上冗余计算一份较小的 Query 投影；
+1. 新 token 产生 Query；根据 TP/DCP 的布局，可能先 AllGather Query heads，或在各 DCP rank 上冗余计算一份较小的 Query 投影（VLLM_DCP_Q_REPLICATE=1控制）
 2. 每个 rank 只用本地 KV shard 计算局部 Attention；
 3. 每个 rank 得到局部输出，以及局部 softmax 的归一化统计量（常表示为 LSE，log-sum-exp）；
 4. 通过 AllGather + ReduceScatter 或 All-to-All 等集合通信，精确合并局部结果；
@@ -158,7 +158,7 @@ O = [Σ exp(m_r - m) · z_r] / L
 
 ### 4.3 为什么使用交错布局
 
-Decode 时 KV Cache 每一步都会增长。如果采用固定的连续区间切分，新增 token 容易持续落到最后一个 rank，造成容量和读取负载倾斜。
+Decode 时 KV Cache 每一步都会增长。如果采用固定的连续区间切分，==新增 token 容易持续落到最后一个 rank，造成容量和读取负载倾斜。==
 
 交错布局可写成近似规则：
 
@@ -170,14 +170,14 @@ target_rank = floor(token_index / interleave_size) mod D
 
 ### 4.4 DCP 与少 KV head 模型
 
-普通 TP 先沿 KV head 维切分。但当 `TP size > KV head 数 H` 时，head 维已经无法继续切，一些 rank 会保存重复 KV Cache。MLA 常可等效为极少量 KV head，因此这种重复尤其明显。
+普通 TP 先沿 KV head 维切分。但当 `TP size > KV head 数 H` 时，head 维已经无法继续切，一些 rank 会==保存重复 KV Cache==。MLA 常可等效为极少量 KV head，因此这种重复尤其明显。
 
 在当前 vLLM 的典型约束下，可把 DCP 理解为在这些原本复制 KV 的 TP ranks 之间改为沿序列维切分：
 
 - DeepSeek-R1（MLA 可视作 1 个 KV head），`TP=8` 时可用 `DCP=8` 消除 8 份 KV 重复；
 - Qwen3-235B-A22B 有 4 个 KV heads，`TP=8` 时存在约 2 份重复，可用 `DCP=2` 消除。
 
-序列维切为 `D` 份后，相关 KV 部分的单 rank 占用理想上约降为 `1/D`。但 DCP 每层、每个 Decode step 都要通信，所以它常常首先是**容量与吞吐优化**，并不保证单请求 TPOT 一定降低。
+序列维切为 `D` 份后，==相关 KV 部分的单 rank 占用理想上约降为 `1/D`==。但 DCP 每层、每个 Decode step 都要通信，所以它常常首先是**容量与吞吐优化**，==并不保证单请求 TPOT 一定降低。==
 
 ---
 
