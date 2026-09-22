@@ -1,4 +1,4 @@
-# FlashAttention v2（FA2）
+# FlashAttention v2（FA2）笔记
 
 > 口径：基于 2023 年 FA2 论文、作者说明和官方仓库整理，面向没有 GPU 系统基础的读者。
 
@@ -14,7 +14,7 @@
 Split-Q：每个warp负责不同输出，减少通信和同步
 ```
 
-FA2 仍是完整的密集 Attention。它主要改变计算顺序和工作分配，不把计算复杂度从 `O(N²)` 变为线性。
+FA2 仍是完整的密集 Attention。它主要改变计算顺序和工作分配，不把计算复杂度从 `O(N²)` 变为线性。==FA1中说的是中间结果的空间复杂度降低。==
 
 ---
 
@@ -30,7 +30,7 @@ FA2 没有推翻 FA1，而是在同一算法骨架上优化“怎么算”和“
 
 ---
 
-## 3. 名词解释
+## 3. 名词翻译
 
 继续把 GPU 想成一座有许多车间的工厂：
 
@@ -52,6 +52,41 @@ FA2 没有推翻 FA1，而是在同一算法骨架上优化“怎么算”和“
 ---
 
 ## 4. 三项核心优化
+
+### 4.0 先澄清：IO 没有消失
+
+分块 Attention 仍要持续搬运数据：
+
+```text
+HBM中的K/V块 → Shared Memory → register / Tensor Core
+```
+
+每个 Q 块都必须扫描相关的 K/V 块，所以“高频搬运”仍然存在。FlashAttention 解决的是三件不同的事：
+
+1. **减少流量**：不把完整的 `S`、`P` 写入 HBM；
+2. **提高复用**：一个 K/V tile 搬到片上后，立刻参与一整块矩阵乘，而不是只服务一个元素；
+3. **隐藏延迟**：准备足够多的独立 thread block/warp；某些任务等待数据时，SM 可以执行其他已就绪任务。
+
+其中要区分：
+
+- **延迟**是“一次搬运要等多久”，可以通过并行任务和流水线隐藏；
+- **带宽压力**是“单位时间总共要搬多少数据”，无法靠调度凭空消除，只能减少流量或提高数据复用。
+
+#### FA1 与 FA2 的循环顺序也是一种取舍
+
+```text
+FA1：外层K/V块，内层Q块
+     K/V块复用较好，但Q/O/m/ell会随K/V循环反复读取和写回；
+     一个head主要由一个thread block处理，并行任务可能不够。
+
+FA2：外层Q块，内层K/V块
+     一个thread block固定负责Q_i；Q_i、O_i、m_i、ell_i可留在片上，
+     但每个Q块都要依次流式读取K/V。
+```
+
+所以 FA2 不是“没有 IO 压力”，而是选择了更适合 GPU 并行执行的访问模式。==多个 Q block 可同时运行；当一个 warp 等待 K/V 时，硬件可以调度其他就绪 warp，从而减少计算单元空等。==若总数据量已经打满 HBM 带宽，仅增加并行度并不能继续加速。
+
+FA2 论文的重点是用 **sequence parallelism 提高 occupancy**、用 **Split-Q 减少 Shared Memory 通信**。把 HBM→SMEM 搬运与 GEMM 做成明确的 producer/consumer 异步流水线，则是 FA3 在 Hopper 上进一步强化的重点。
 
 ### 4.1 减少 non-matmul FLOPs
 
@@ -79,9 +114,9 @@ K/V块2 → 更新未归一化结果 ─┘
 
 ### 4.2 沿序列维度增加并行任务
 
-FA1 主要按 `batch × attention head` 创建 thread block。若 batch 和 head 数量小，即使序列很长，也可能没有足够任务填满 GPU。
+FA1 **主要按 `batch × attention head` 创建 thread block**。若 batch 和 head 数量小，即使序列很长，也可能没有足够任务填满 GPU。
 
-FA2 进一步把 Q 序列切成多个行块。forward 中，每个 thread block 独立负责一块 Q 和对应的输出行，再依次扫描全部 K/V 块。
+==FA2 进一步把 Q 序列切成多个行块。forward 中，每个 thread block 独立负责一块 Q 和对应的输出行，再依次扫描全部 K/V 块。也就是为什么FA2的循环顺序和FA1相反。==
 
 **图例 2：把一项长工作拆给更多车间**
 
@@ -98,9 +133,9 @@ SM4 [Q4]  SM5 [Q5]  SM6 [Q6]  SM7 [Q7]
              ↑ 更多SM可以同时工作
 ```
 
-在 backward 中，FA2 采用适合梯度计算的另一方向，主要按 K/V 的列块并行，以减少写入冲突。
-
 **好处**：尤其在“batch/head 少但序列长”的情况下，提高 GPU 利用率。
+
+这里的利用率提升也在帮助**隐藏延迟**：一个 thread block 因访存暂时不能继续时，SM 上其他就绪的 block/warp 可以接替执行。==但它隐藏的是等待时间，不代表 K/V 搬运量消失。==
 
 ### 4.3 从 Split-K 改为 Split-Q
 
@@ -142,16 +177,17 @@ Warp 3：[Q行3] ─────→ [最终O行3]
 
 ## 5. FA1 与 FA2 的关系
 
-| 对比项               | FA1              | FA2              |
-| ----------------- | ---------------- | ---------------- |
-| 首要目标              | 减少 HBM IO        | 提高并行度和硬件利用率      |
-| 分块、Online Softmax | 有                | 保留并改写更新公式        |
-| 完整 `S`、`P` 写回 HBM | 不需要              | 不需要              |
-| forward 的任务切分     | 主要按 batch、head   | 再沿 Q 序列切分        |
-| block 内 warp 分工   | Split-K，需要合并部分输出 | Split-Q，各自拥有不同输出 |
-| 非矩阵运算             | 已显著优化            | 进一步减少            |
-| 主要计算复杂度           | `O(N²d)`         | 仍为 `O(N²d)`      |
-| Attention 额外中间存储  | `O(N)`           | 仍为 `O(N)`        |
+| 对比项 | FA1 | FA2 |
+|---|---|---|
+| 首要目标 | 减少 HBM IO | 提高并行度和硬件利用率 |
+| 分块、Online Softmax | 有 | 保留并改写更新公式 |
+| 完整 `S`、`P` 写回 HBM | 不需要 | 不需要 |
+| forward 的任务切分 | 主要按 batch、head | 再沿 Q 序列切分 |
+| block 内 warp 分工 | Split-K，需要合并部分输出 | Split-Q，各自拥有不同输出 |
+| 非矩阵运算 | 已显著优化 | 进一步减少 |
+| 剩余搬运的处理 | 并行任务较少，等待更容易暴露 | 更多 Q block 并行以隐藏延迟，并减少 SMEM 通信 |
+| 主要计算复杂度 | `O(N²d)` | 仍为 `O(N²d)` |
+| Attention 额外中间存储 | `O(N)` | 仍为 `O(N)` |
 
 最简记忆：
 
@@ -174,18 +210,7 @@ FA2：少做慢运算，并把工作分得更细、更合理
 kernel 加速不会等比例变成整个模型加速，因为模型还要执行线性层、MLP、通信等工作。实际结果也会随 GPU、序列长度、head dimension、mask、数据类型和框架版本变化。
 
 ---
-
-## 7. 使用和理解边界
-
-- FA2 仍计算完整的密集 Attention，不是稀疏或线性 Attention；
-- 它继续使用 backward 重算，因此训练时仍是“多算一点、少存很多”；
-- tile 越大不一定越好：它能减少管理开销，却会占用更多 Shared Memory 和 register；
-- 论文性能主要来自 A100 测试，当前官方实现已扩展到更多 GPU，具体支持范围应以仓库说明为准；
-- 长序列 Prefill/训练通常更容易发挥矩阵乘并行度；单 token Decode 还会受到 KV Cache 读取和调度限制。
-
----
-
-## 8. 面试式总结
+## 7. 面试式总结
 
 > FlashAttention v2 沿用 FA1 的 IO-aware 分块算法，重点提高 GPU 利用率。它改写 online softmax，减少较慢的缩放、除法等非矩阵运算；沿 Q 序列增加 thread block 数量，使小 batch、少 head、长序列时也有足够并行任务；并把 warp 分工从 Split-K 改为 Split-Q，让每个 warp 独立完成不同输出行，减少 Shared Memory 通信、同步和归并。因此 FA2 不改变 Attention 的 `O(N²)` 主要计算量和 `O(N)` 额外存储量，却比 FA1 更接近 GPU 的理论吞吐。
 
@@ -197,9 +222,9 @@ FA2 = FA1的少IO + 更少慢运算 + 更多并行任务 + 更少warp通信
 
 ---
 
+
 ## 参考资料
 
 - [FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning](https://arxiv.org/abs/2307.08691)
 - [作者博客：FlashAttention-2](https://princeton-nlp.github.io/flash-atttention-2/)
 - [FlashAttention 官方仓库](https://github.com/Dao-AILab/flash-attention)
-
