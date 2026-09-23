@@ -157,7 +157,7 @@ FP8 Tensor Core 的 GEMM 吞吐更高，但 E4M3 尾数只有 3 bit，且 LLM �
 FP8量化：      小块内数值接近，较少信息被粗刻度吞掉
 ```
 
-对 Q、K 同乘正交矩阵 `M`：
+因为对 Q、K 同乘正交矩阵 `M`：
 
 ```text
 (QM)(KM)ᵀ = QMMᵀKᵀ = QKᵀ
