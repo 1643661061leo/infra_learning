@@ -1,6 +1,6 @@
 # MTP 推理解码学习笔记
 
-> 只讨论 DeepSeek-V3 MTP 在推理阶段如何作为 drafter，不展开训练目标和 loss。
+> 只讨论 一般的 MTP 在推理阶段如何作为 drafter，不展开训练目标和 loss。
 
 ## 1. 一句话理解
 
@@ -22,29 +22,41 @@ Target hidden + 当前 token
 
 ---
 
-## 2. 结构与符号
+## 2. 常见的MTP（详见4）
+### 并行 MTP
 
-一个 DeepSeek-V3 MTP 模块包含：
+多个 heads 从同一个 hidden 并行预测：
 
-```text
-共享 Token Embedding：[V,H]
-hnorm、enorm：         RMSNorm
-eh_proj：              [2H,H]
-一个额外 Transformer Block
-共享 LM Head：         [H,V]
+```python
+hidden = Backbone(prefix)[:, -1, :]  # [B,H]
+logits = MTP_Heads(hidden)            # [B,N,V]
 ```
 
-| 符号 | 含义 |
-|---|---|
-| `B` | 同时解码的请求数 |
-| `S` | `current_token` 之前、已写入 Target KV Cache 的上下文长度 |
-| `H` | 每个 token 的 hidden 特征数 |
-| `V` | 词表中的候选 token 数 |
-| `K` | 一轮 rollout 的 Draft token 数 |
-| `a_b` | 第 `b` 条请求接受的 Draft token 数 |
+第 `i` 个 head 通常只依赖原始前缀：
+  
+$$
+q_i(x_{t+i}\mid x_{\le t})  
+$$
+
+所以后面的 head 不一定看过前面预测出的 token。
+
+### 顺序 MTP
+
+后一个预测依赖前一个 Draft token 或 hidden：
+
+```text
+prefix → draft₁ → draft₂ → ... → draftₙ
+```
+
+对应：
+
+$$
+q_i(x_{t+i}\mid x_{\le t},d_{<i})  
+$$
+
+这种结构候选更连贯，但 Draft 阶段存在串行计算。DeepSeek‑V3 MTP 更接近这一类。
 
 ---
-
 ## 3. 一轮开始时的状态
 
 MTP 需要一对严格对齐的输入：
@@ -71,488 +83,376 @@ MTP 使用 h_i + Emb(x_{i+1}) 预测 x_{i+2}
 
 ---
 
-## 4. MTP 单步预测一个候选 token
+## 4. MTP 生成未来位置的预测
 
-```python
-# -------------------------------------------------
-# ① 当前每条请求各有一个实际 token ID
-# -------------------------------------------------
+不同 MTP 结构采用不同方式生成未来 `K` 个位置。
 
-current_token_ids                          # [B]
+### 并行 MTP
 
-# [B] = B 条请求，每条请求一个 token ID
+多个 heads 从同一个上下文 hidden 同时预测：
 
+```
+context_hidden = Backbone(prefix_ids)[:, -1, :]   # [B,H]
 
-# -------------------------------------------------
-# ② 查共享 Embedding
-# -------------------------------------------------
+draft_logits = MTP_Heads(context_hidden)    # [B,K,V]
+draft_probs = softmax(draft_logits, dim=-1) # [B,K,V]
 
-current_embedding = Emb(current_token_ids)  # [B,H]
-
-# current_embedding[b,:] =
-# 第 b 条请求当前 token 的 H 个 embedding 特征
-
-
-# -------------------------------------------------
-# ③ 归一化父 hidden 和当前 token embedding
-# -------------------------------------------------
-
-hidden_normed = hnorm(parent_hidden)         # [B,H]
-embedding_normed = enorm(current_embedding)  # [B,H]
-
-
-# -------------------------------------------------
-# ④ 沿 hidden 维拼接两路信息
-# -------------------------------------------------
-
-fused = concat(
-    [hidden_normed, embedding_normed],
-    dim=-1,
-)                                           # [B,2H]
-
-# fused[b,:] 包含：
-# 1. 历史上下文的 H 维语义表示
-# 2. 当前实际 token 的 H 维表示
-
-
-# -------------------------------------------------
-# ⑤ 将 2H 维融合特征压缩回 H 维
-# -------------------------------------------------
-
-mtp_input = fused @ eh_proj                  # [B,H]
-
-# eh_proj：[2H,H]
-# mtp_input[b,:] 是第 b 条请求的 H 维 MTP 输入
-
-
-# -------------------------------------------------
-# ⑥ 运行一个额外 Transformer Block
-# -------------------------------------------------
-
-next_hidden = MTP_Block(
-    mtp_input.unsqueeze(1),                 # [B,1,H]
-    past_key_values=mtp_kv_cache,
-).squeeze(1)                                # [B,H]
-
-# next_hidden[b,:] =
-# 第 b 条请求当前 MTP 步骤产生的 H 维表示
-
-
-# -------------------------------------------------
-# ⑦ 使用共享 LM Head 得到 V 个候选分数
-# -------------------------------------------------
-
-draft_logits = LM_Head(next_hidden)          # [B,V]
-
-# [B,V] =
-# B 条请求
-# × 每条请求 V 个候选 token 分数
-
-
-# -------------------------------------------------
-# ⑧ 对每条请求的 V 个候选做 softmax
-# -------------------------------------------------
-
-draft_probs = softmax(draft_logits, dim=-1) # [B,V]
-
-# draft_probs[b,:] =
-# 第 b 条请求对下一个 token 的 V 个候选概率
-# 这一行 V 个概率之和为 1
-
-
-# -------------------------------------------------
-# ⑨ 每条请求采样一个候选 token
-# -------------------------------------------------
-
-draft_token = sample(draft_probs)            # [B]
-
-# draft_token[b] =
-# 第 b 条请求从自己的 V 个候选中采出的一个 token ID
+draft_tokens = select(draft_probs)          # [B,K]
 ```
 
-单步关系：
+其中：
 
-```text
-parent hidden [B,H] + current token [B]
-→ next hidden [B,H] + Draft distribution [B,V]
-→ Draft token [B]
+```
+draft_probs[b,k,:]
+= 第 b 条请求对第 k 个未来位置的预测分布
 ```
 
----
+第 `k` 个 head 通常只依赖原始前缀：
 
-## 5. 连续 rollout K 个 Draft token
+$$
+q_k(\cdot\mid x_{\le t})  
+$$
 
-```python
-parent = parent_hidden                     # [B,H]
-current = current_token_ids                 # [B]
+因此所有位置可以并行预测，但后面的 head 没有看到前面实际选出的 Draft token。
+
+### 顺序 MTP
+
+顺序 MTP 逐步生成候选：
+
+```
+state = initial_draft_state
+current = last_prefix_token
 
 draft_tokens = []
 draft_prob_list = []
 
 for k in range(K):
-    # -------------------------------------------------
-    # ① 当前实际/候选 token 转成 embedding
-    # -------------------------------------------------
+    state, logits_k = MTP_Step(state, current)  # logits_k: [B,V]
 
-    token_embedding = Emb(current)          # [B,H]
-
-# token_embedding[b,:] =
-# 第 b 条请求当前 rollout token 的 H 维 embedding
-
-
-    # -------------------------------------------------
-    # ② 与产生当前 token 的父 hidden 融合
-    # -------------------------------------------------
-
-    fused = concat(
-        [hnorm(parent), enorm(token_embedding)],
-        dim=-1,
-    )                                       # [B,2H]
-
-    mtp_input = fused @ eh_proj             # [B,H]
-
-
-    # -------------------------------------------------
-    # ③ MTP Block 产生下一个位置的 hidden
-    # -------------------------------------------------
-
-    next_hidden = MTP_Block(
-        mtp_input.unsqueeze(1),             # [B,1,H]
-        past_key_values=mtp_kv_cache,
-    ).squeeze(1)                            # [B,H]
-
-
-    # -------------------------------------------------
-    # ④ 每条请求得到 V 个候选概率
-    # -------------------------------------------------
-
-    logits_k = LM_Head(next_hidden)          # [B,V]
     probs_k = softmax(logits_k, dim=-1)      # [B,V]
+    token_k = select(probs_k)                # [B]
 
-# probs_k[b,:] =
-# 第 b 条请求在第 k 个 Draft 位置的 V 个候选概率
+    draft_tokens.append(token_k[:, None])
+    draft_prob_list.append(probs_k[:, None, :])
 
-
-    # -------------------------------------------------
-    # ⑤ 每条请求采样一个 Draft token
-    # -------------------------------------------------
-
-    token_k = sample(probs_k)               # [B]
-
-# token_k[b] =
-# 第 b 条请求在第 k 个 Draft 位置采出的 token ID
-
-
-    # -------------------------------------------------
-    # ⑥ 保存 token 和完整 Draft 分布
-    # -------------------------------------------------
-
-    draft_tokens.append(token_k[:, None])   # 每项 [B,1]
-    draft_prob_list.append(probs_k[:, None])# 每项 [B,1,V]
-
-
-    # -------------------------------------------------
-    # ⑦ 当前输出成为下一步输入
-    # -------------------------------------------------
-
-    parent = next_hidden                    # [B,H]
-    current = token_k                       # [B]
+    current = token_k
 ```
 
-拼接 `K` 步：
+拼接后：
 
-```python
+```
 draft_tokens = concat(draft_tokens, dim=1)  # [B,K]
 
-# draft_tokens[b,k] =
-# 第 b 条请求、第 k 个位置的候选 token ID
-
-draft_probs = concat(draft_prob_list, dim=1)# [B,K,V]
-
-# draft_probs[b,k,:] =
-# 第 b 条请求、第 k 个位置的 V 个候选概率
+draft_probs = concat(draft_prob_list, dim=1)  # [B,K,V]
 ```
 
-这部分是自回归的：后一个候选依赖前一个采样结果。因此 rollout 越长，Draft 延迟和误差累积通常越明显。
+此时第 `k` 步依赖前面的 Draft token：
+
+$$
+q_k(\cdot\mid x_{\le t},d_{<k})  
+$$
+
+DeepSeek‑V3 MTP 属于这种顺序生成的具体实现。
 
 ---
 
-## 6. 构造 Target 验证输入
+## 5. Draft block 的统一表示
 
-先看最简单的单路径、统一长度 `K` 情况。
+无论内部采用并行还是顺序结构，单路径候选都可以表示为：
 
-```python
-# -------------------------------------------------
-# ① 将当前真实 token 放在 Draft block 前面
-# -------------------------------------------------
-
-verify_input_ids = concat(
-    [
-        current_token_ids[:, None],         # [B,1]
-        draft_tokens,                       # [B,K]
-    ],
-    dim=1,
-)                                           # [B,K+1]
-
-# 第 b 条请求的输入：
-# [current_token, draft_1, ..., draft_K]
-#
-# [B,K+1] =
-# B 条请求
-# × 每条请求 1 个当前 token + K 个 Draft token
+```
+draft_tokens                            # [B,K]
+draft_probs                             # [B,K,V]
 ```
 
-位置对齐：
+其中：
 
-```text
-current_token 位置的 Target logits → 验证 draft_1
-draft_1 位置的 Target logits       → 验证 draft_2
-...
-draft_K 位置的 Target logits       → 生成 bonus token
 ```
+draft_tokens[b,k]
+= 第 b 条请求在第 k 个未来位置选择的 token
+
+draft_probs[b,k,:]
+= 产生该候选时使用的 V 维概率分布
+```
+
+但两类结构中 `draft_probs` 的条件不同：
+
+```
+并行 MTP：q_k(· | prefix)
+顺序 MTP：q_k(· | prefix, draft_<k)
+```
+
+这个区别会影响随机采样时可以使用的接受算法。
 
 ---
 
-## 7. Target 一次验证整个 block
+## 6. Target 验证时的位置对齐
 
-```python
-# -------------------------------------------------
-# ① Target 使用已有 KV Cache，一次处理 K+1 个位置
-# -------------------------------------------------
+假设 Target KV Cache 已经包含完整前缀：
 
+```
+[x₁, ..., xₜ]
+```
+
+并且保存了前缀最后位置产生的：
+
+```
+prefix_next_logits                     # [B,V]
+```
+
+它用于预测第一个 Draft token。
+
+将整个 Draft block 一次送入 Target（==这里是把draft token并行计算，从而只需要读取一次权重计算，而不需要读取K次权重计算，这也是投机解码快的关键==）：
+
+```
 target_output = TargetModel(
-    input_ids=verify_input_ids,             # [B,K+1]
+    input_ids=draft_tokens,             # [B,K]
     past_key_values=target_kv_cache,
-    output_hidden_states=True,
 )
 
-target_logits = target_output.logits         # [B,K+1,V]
-
-# [B,K+1,V] =
-# B 条请求
-# × 每条请求 K+1 个输入位置
-# × 每个位置 V 个候选 token 分数
-
-
-# -------------------------------------------------
-# ② 每个位置的 V 个分数转换成概率
-# -------------------------------------------------
-
-target_probs = softmax(target_logits, dim=-1)
-                                                # [B,K+1,V]
-
-# target_probs[b,j,:] =
-# 第 b 条请求在第 j 个输入位置对下一个 token 的 V 个概率
-
-
-# -------------------------------------------------
-# ③ 前 K 行与 MTP 的 K 个 Draft 分布对齐
-# -------------------------------------------------
-
-target_verify_probs = target_probs[:, :K, :]# [B,K,V]
-
-# target_verify_probs[b,k,:]：Target 的 V 个候选概率
-# draft_probs[b,k,:]：       MTP 的 V 个候选概率
-# draft_tokens[b,k]：        MTP 实际选出的 token ID
+draft_position_logits = target_output.logits  # [B,K,V]
 ```
 
-最后一行：
+位置关系是：
 
-```python
-bonus_probs = target_probs[:, K, :]          # [B,V]
-
-# 只有全部 K 个 Draft token 都接受时才使用
 ```
+prefix_next_logits              → 验证 draft₁
+draft_position_logits[:,0,:]    → 验证 draft₂
+draft_position_logits[:,1,:]    → 验证 draft₃
+...
+draft_position_logits[:,K-2,:]  → 验证 draft_K
+draft_position_logits[:,K-1,:]  → 生成 bonus token
+```
+
+如果系统没有保存 `prefix_next_logits`，也可以重新处理前缀最后一个 token。两种方式只是 Cache 约定不同。
 
 ---
 
-## 8. Rejection Sampling
+## 7. 得到验证分布与 bonus 分布
 
-```python
-# -------------------------------------------------
-# ① 取出 Target 给每个已提议 token 的概率
-# -------------------------------------------------
+将位置重新对齐：
 
-selected_target_prob = gather(
-    target_verify_probs,                    # [B,K,V]
-    draft_tokens,                           # [B,K]
+```
+target_verify_logits = concat(
+    [
+        prefix_next_logits[:, None, :],      # [B,1,V]
+        draft_position_logits[:, :-1, :],    # [B,K-1,V]
+    ],
+    dim=1,
+)                                           # [B,K,V]
+
+target_verify_probs = softmax(
+    target_verify_logits,
+    dim=-1,
+)                                           # [B,K,V]
+```
+
+其中：
+
+```
+target_verify_probs[b,k,:]
+= Target 在 prefix + draft_<k 条件下
+  对第 k 个 Draft token 的预测分布
+```
+
+最后一个位置用于产生 bonus：
+
+```
+bonus_probs = softmax(
+    draft_position_logits[:, -1, :],
+    dim=-1,
+)                                           # [B,V]
+```
+
+Target 虽然一次处理整个 block，但因果 attention 会保证每个位置只能看到它前面的 token。
+
+---
+
+## 8. Greedy 解码的接受规则
+
+Greedy 解码下，先取得 Target 在各位置选择的 token：
+
+```
+target_tokens = argmax(
+    target_verify_probs,
+    dim=-1,
 )                                           # [B,K]
 
-# selected_target_prob[b,k] =
-# target_verify_probs[b,k,draft_tokens[b,k]]
+match_mask = draft_tokens == target_tokens  # [B,K]
+```
 
+第一次不匹配后，后续 Draft token 全部失效：
 
-# -------------------------------------------------
-# ② 取出 MTP 自己给同一 token 的概率
-# -------------------------------------------------
-
-selected_draft_prob = gather(
-    draft_probs,                            # [B,K,V]
-    draft_tokens,                           # [B,K]
+```
+accept_prefix = cumprod(
+    match_mask.to(int),
+    dim=1,
 )                                           # [B,K]
-
-
-# -------------------------------------------------
-# ③ 计算每个候选 token 的接受概率
-# -------------------------------------------------
-
-accept_prob = minimum(
-    1,
-    selected_target_prob / selected_draft_prob,
-)                                           # [B,K]
-
-# accept_prob[b,k] =
-# 第 b 条请求、第 k 个 Draft token 的接受概率
-
-
-# -------------------------------------------------
-# ④ 对每个位置进行随机接受测试
-# -------------------------------------------------
-
-accept_mask = random(shape=(B, K)) < accept_prob
-                                                # [B,K]
-
-
-# -------------------------------------------------
-# ⑤ 第一次拒绝后丢弃同一请求的所有后缀
-# -------------------------------------------------
-
-accept_prefix = cumprod(accept_mask, dim=1) # [B,K]
-
-# 例如：
-# accept_mask   = [1,1,0,1]
-# accept_prefix = [1,1,0,0]
-
-
-# -------------------------------------------------
-# ⑥ 得到每条请求接受的连续 Draft token 数
-# -------------------------------------------------
 
 accepted_count = accept_prefix.sum(dim=1)   # [B]
-
-# accepted_count[b] = a_b
 ```
-
----
-
-## 9. correction 与 bonus
 
 对第 `b` 条请求：
 
-```python
-a_b = accepted_count[b]                    # 标量
+```
+a_b = accepted_count[b]
 ```
 
-中途拒绝时：
+如果中途出现不匹配：
 
-```python
+```
 if a_b < K:
-    # -------------------------------------------------
-    # ① 取第一个拒绝位置的完整 Target/Draft 分布
-    # -------------------------------------------------
-
-    target_dist = target_verify_probs[b, a_b, :]
-                                                # [V]
-    draft_dist = draft_probs[b, a_b, :]      # [V]
-
-# [V] = 被拒绝位置对整个词表 V 个 token 的概率
-
-
-    # -------------------------------------------------
-    # ② 从归一化残差分布采样 correction
-    # -------------------------------------------------
-
-    residual = clamp(target_dist - draft_dist, min=0)
-                                                # [V]
-    residual = residual / residual.sum()     # [V]
-    next_token_b = sample(residual)          # 标量
-
-
-    # -------------------------------------------------
-    # ③ 提交接受前缀和 correction
-    # -------------------------------------------------
+    correction = target_tokens[b, a_b]
 
     committed_b = concat(
-        [draft_tokens[b, :a_b], next_token_b[None]],
+        [
+            draft_tokens[b, :a_b],
+            correction[None],
+        ],
         dim=0,
-    )                                       # [a_b+1]
+    )
 ```
 
-全部接受时：
+如果全部匹配：
 
-```python
+```
 else:
-    # -------------------------------------------------
-    # ① Target 最后一行预测 Draft block 后的 token
-    # -------------------------------------------------
-
-    next_token_b = sample(bonus_probs[b, :])# 标量
-
-
-    # -------------------------------------------------
-    # ② 提交全部 Draft token 和 bonus
-    # -------------------------------------------------
+    bonus = argmax(bonus_probs[b])
 
     committed_b = concat(
-        [draft_tokens[b, :], next_token_b[None]],
+        [
+            draft_tokens[b, :],
+            bonus[None],
+        ],
         dim=0,
-    )                                       # [K+1]
+    )
 ```
 
 总结：
 
-```text
-中途拒绝：接受前缀 + correction
-全部接受：全部 Draft + bonus
 ```
+中途不匹配：接受前缀 + Target correction
+全部匹配：全部 Draft + Target bonus
+```
+
+该规则适用于并行和顺序 MTP，并保持与普通 Target greedy decoding 相同的输出。
 
 ---
 
-## 10. 更新缓存并进入下一轮
+## 9. 随机采样的接受规则
 
-```python
-# -------------------------------------------------
-# ① 只提交真实接受的 token
-# -------------------------------------------------
+标准 rejection sampling 要求 Drafter 提供实际生成候选时使用的条件分布：
 
-output_ids[b] = concat(
-    [output_ids[b], committed_b],
-    dim=0,
+$$
+q_k(\cdot\mid x_{\le t},d_{<k})  
+$$
+
+因此它通常可以直接用于顺序 Drafter。
+
+对于候选 `draft_tokens[b,k]`：
+
+```
+target_prob = target_verify_probs[b, k, draft_token]
+draft_prob = draft_probs[b, k, draft_token]
+
+accept_prob = min(
+    1,
+    target_prob / draft_prob,
+)
+```
+
+如果接受，则继续验证下一个位置。
+
+如果拒绝，则从残差分布采样 correction：
+
+```
+target_dist = target_verify_probs[b, k, :]  # [V]
+draft_dist = draft_probs[b, k, :]           # [V]
+
+residual = clamp(
+    target_dist - draft_dist,
+    min=0,
 )
 
-
-# -------------------------------------------------
-# ② 丢弃拒绝位置后的临时 KV Cache
-# -------------------------------------------------
-
-target_kv_cache.crop_to_committed_prefix()
-mtp_kv_cache.crop_to_committed_prefix()
-
-# rejected suffix 没进入最终序列，不能留在 Cache
-
-
-# -------------------------------------------------
-# ③ 为下一轮准备对齐的 hidden-token 对
-# -------------------------------------------------
-
-parent_hidden_next = hidden_that_predicted(next_token_b)
-                                                # [H]
-current_token_next = next_token_b           # 标量
-
-# 下一轮继续：
-# parent_hidden_next + Emb(current_token_next)
-# → MTP 预测再下一个候选
+residual = residual / residual.sum()
+correction = sample(residual)
 ```
 
-闭环：
+如果全部 Draft token 都接受，则从 `bonus_probs` 采样 bonus。
 
-```text
-本轮 correction/bonus → 下一轮 current token
-产生它的 Target hidden → 下一轮 parent hidden
+需要注意：
+
 ```
+顺序 MTP：
+q_k 条件于前面的 Draft，可使用匹配的逐 token
+rejection sampling。
+
+并行 MTP：
+q_k 通常只条件于原始前缀，不能直接套用上述公式。
+应使用 greedy 验证、专门的联合验证算法，或明确接受近似采样。
+```
+
+因此，rejection sampling 不是所有 MTP 的固定组成部分。
 
 ---
 
+## 10. 提交结果并更新 Cache
+
+首先将本轮确认的 token 写入输出：
+
+```
+output_ids[b] = concat(
+    [
+        output_ids[b],
+        committed_b,
+    ],
+    dim=0,
+)
+```
+
+Target 验证时临时处理了全部 `K` 个 Draft token，但只能保留已经接受的连续前缀：
+
+```
+保留：原始前缀 + accepted Draft tokens
+丢弃：第一个拒绝位置及其后缀
+```
+
+本轮产生的 correction 或 bonus 只是从 Target logits 中选出，通常还没有作为输入写入 KV Cache。因此可以选择：
+
+```
+方案一：立即对 correction/bonus 补一次 Target forward；
+
+方案二：下一轮验证时，把它作为尚未进入 Cache 的
+第一个输入一起处理。
+```
+
+MTP 状态的处理取决于具体结构：
+
+```
+并行 MTP：
+通常没有独立的 Draft KV Cache，只需从新的前缀 hidden
+重新产生未来预测。
+
+顺序 MTP：
+需要裁剪或重建 Draft 状态，不能保留被拒绝后缀对应的
+临时 hidden 或 KV Cache。
+```
+
+通用闭环为：
+
+```
+生成 Draft block
+      ↓
+Target 批量验证
+      ↓
+接受连续前缀
+      ↓
+提交 correction 或 bonus
+      ↓
+将 Target 与 Draft 状态对齐到新前缀
+      ↓
+开始下一轮
+```
 ## 11. SGLang 的 EAGLE/树形候选
 
 上面是最容易理解的单路径。SGLang 将原生 MTP 按 EAGLE/NEXTN speculative decoding 使用，还可以：
